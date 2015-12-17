@@ -7,8 +7,8 @@ v x y z = GL.vertex (GL.Vertex3 x y z :: GL.Vertex3 GLfloat)
 n x y z = GL.normal (GL.Normal3 x y z :: GL.Normal3 GLfloat)
 t u v   = GL.texCoord (GL.TexCoord2 u v :: GL.TexCoord2 GLfloat)
 
-cubeSide :: IO ()
-cubeSide = renderPrimitive Quads $ do
+drawCubeSide :: IO ()
+drawCubeSide = renderPrimitive Quads $ do
     -- back
     n 0 0 (-1)
     t 0 1 >> v (-1) (-1) (-1)
@@ -33,16 +33,16 @@ cubeSide = renderPrimitive Quads $ do
     t 1 1 >> v   1  (-1)   1
     t 1 0 >> v   1    1    1
     t 0 0 >> v   1    1  (-1)
-cubeTop :: IO ()
-cubeTop = renderPrimitive Quads $ do
+drawCubeTop :: IO ()
+drawCubeTop = renderPrimitive Quads $ do
     -- top
     n 0 1 0
     t 0 1 >> v   1    1  (-1)
     t 1 1 >> v   1    1    1
     t 1 0 >> v (-1)   1    1
     t 0 0 >> v (-1)   1  (-1)
-cubeBot :: IO ()
-cubeBot = renderPrimitive Quads $ do
+drawCubeBot :: IO ()
+drawCubeBot = renderPrimitive Quads $ do
     -- bottom
     n 0 (-1) 0
     t 0 1 >> v   1  (-1)   1

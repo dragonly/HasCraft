@@ -8,6 +8,7 @@ import Graphics.Rendering.OpenGL (($=))
 import Control.Monad
 import Data.Map as Map
 import Data.IORef as IORef
+import Data.Fixed
 
 import Etc
 
@@ -36,7 +37,7 @@ data State = State {
     world :: Map (Int, Int, Int) TexIndex,
     shown :: Map (Int, Int, Int) TexIndex,
     sectors :: Map (Int, Int, Int) [(Int, Int, Int)],
-    mouseCenter :: (GL.GLint, GL.GLint),
+    mousePosLast :: (GL.GLint, GL.GLint),
     player :: Player
 }
 
@@ -45,7 +46,7 @@ makeInitState = State {
     world = Map.fromList [],
     shown = Map.fromList [],
     sectors = fromList [],
-    mouseCenter = (0, 0),
+    mousePosLast = (0, 0),
     player = Player {
         flying = False,
         strafe = (0, 0),
@@ -54,7 +55,7 @@ makeInitState = State {
         dy = 0.0,
         inventory = [GRASS, STONE, SAND],
         block = STONE,
-        eye = GL.Vertex3 0 0 10
+        eye = GL.Vertex3 0 0 0
     }
 }
 
@@ -101,15 +102,12 @@ resize size@(Size w h) = do
     GL.matrixMode $= GL.Modelview 0
     return ()
 
---drawAxis = do
---    --GL.preservingMatrix $ do
---    GL.loadIdentity
---    --GL.translate $ (Vector3 0 0 0 :: Vector3 GLfloat)
---    GL.color $ GL.Color3 255 0 (0::GL.GLfloat)
---    GL.renderPrimitive Lines $
---        mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
---            [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
---    --GL.color $ GL.Color4 0 0 0 (1::GL.GLfloat)
+drawAxis = do
+    GL.preservingMatrix $ do
+        GL.color $ GL.Color3 255 0 (0::GL.GLfloat)
+        GL.renderPrimitive Lines $
+            mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
+                [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
 
 render :: State -> GLStuff -> IORef GLfloat -> IO ()
 render state stuff angle = do
@@ -127,31 +125,43 @@ render state stuff angle = do
     GLU.lookAt eye0 target (GL.Vector3 0.0 1.0 0.0)
     
     a <- get angle
-    GL.rotate a $ GL.Vector3 1.0 0.0 (0.0::GL.GLfloat)
-    GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-    GL.translate $ (Vector3 (0) (5) (0) :: Vector3 GLfloat)
+    GL.preservingMatrix $ do
+        GL.rotate a $ GL.Vector3 1 0 (0::GL.GLfloat)
+        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-    GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        GL.translate $ (Vector3 0 10 0 :: Vector3 GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
     GL.preservingMatrix $ do
-        cubeSide
-    GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        GL.rotate (a-1) $ GL.Vector3 0 1 (0::GL.GLfloat)
+        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (Vector3 0 0 10 :: Vector3 GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (brick stuff)
+        drawCubeSide
+        drawCubeTop
+        drawCubeBot
     GL.preservingMatrix $ do
-        cubeTop
-    GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-    GL.preservingMatrix $ do
-        cubeBot
+        GL.rotate (a-2) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (Vector3 10 0 0 :: Vector3 GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (sand stuff)
+        drawCubeSide
+        drawCubeTop
+        drawCubeBot
+
+    --drawAxis
 
     GLFW.swapBuffers
-
-addMouseHandler rotation position = do
-    GLFW.mousePosCallback $= \(Position x y) -> do
-        let dx = x - 400
-            dy = y - 300
-            x' = (fromIntegral dx) * 180 / 400 / 100
-            yy = (fromIntegral dy) * 90 / 300 / 100
-            y' = max (-90) $ min 90 yy
-        writeIORef rotation (x', (-y'))
 
 getSightVector (alpha, beta) = 
     let x = realToFrac $ sin alpha
@@ -187,21 +197,27 @@ update state dt angle = do
     d <- GLFW.getKey 'D'
     space <- GLFW.getKey ' '
     let state0 = state
+        (mousePosLastX, mousePosLastY) = mousePosLast state0
         player' = player state0
         GL.Vertex3 x y z = eye player'
-        dx = mouseX - 400
-        dy = mouseY - 300
-        alpha = (fromIntegral dx) * 180 / 400 / 100
-        yy = (fromIntegral dy) * 90 / 300 / 100
-        beta = max (-90) $ min 90 yy
-        rotation' = (alpha, (-beta))
+        (alpha0, beta0) = rotation player'
+
+        dx = mouseX - mousePosLastX
+        dy = mouseY - mousePosLastY
+        deltaAlpha = (fromIntegral dx) * pi / 400
+        deltaBeta = (fromIntegral dy) * pi/2 /300
+        --beta = -(max (-(pi/2)) $ min (pi/2) beta')
+        alpha = (alpha0 + deltaAlpha) `mod'` (2*pi)
+        beta = (max (-(pi/2)) $ min (pi/2) (beta0 - deltaBeta))
+        rotation' = (alpha,beta)
         (tgX, tgY, tgZ) = getSightVector (alpha, beta)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (tgX, tgY, tgZ)
 
-        deltaW = GL.Vertex3 (tgX*0.1) (tgY*0.1) (tgZ*0.1)
-        deltaS = GL.Vertex3 (-(tgX*0.1)) (-(tgY*0.1)) (-(tgZ*0.1))
-        deltaA = GL.Vertex3 (crossX*0.1) (crossY*0.1) (crossZ*0.1)
-        deltaD = GL.Vertex3 (-(crossX*0.1)) (-(crossY*0.1)) (-(crossZ*0.1))
+        motionScale = 0.2
+        deltaW = GL.Vertex3 (tgX*motionScale) (tgY*motionScale) (tgZ*motionScale)
+        deltaS = GL.Vertex3 (-(tgX*motionScale)) (-(tgY*motionScale)) (-(tgZ*motionScale))
+        deltaA = GL.Vertex3 (crossX*motionScale) (crossY*motionScale) (crossZ*motionScale)
+        deltaD = GL.Vertex3 (-(crossX*motionScale)) (-(crossY*motionScale)) (-(crossZ*motionScale))
         deltaSPACE = GL.Vertex3 0 0.1 0
 
         stateW = processMotion state0 w deltaW
@@ -210,16 +226,18 @@ update state dt angle = do
         stateD = processMotion stateA d deltaD
         stateSPACE = processMotion stateD space deltaSPACE
         state' = stateSPACE
+        eye' = (eye.player) state'
 
-    let eye' = (eye.player) state'
+    --print (alpha/pi*180, beta/pi*180)
     return state { player = player' { rotation = rotation',
                                       eye = eye'
-                                    }
+                                    },
+                   mousePosLast = (mouseX, mouseY)
                  }
 
 
-loop :: State -> GLStuff -> Float -> IORef GLfloat -> IO ()
-loop state stuff lastTime angle = do
+loop :: State -> GLStuff -> Float -> IORef GLfloat -> Int -> IO ()
+loop state stuff lastTime angle countDown = do
     -- dt
     nowD <- get time
     let now = realToFrac nowD
@@ -228,14 +246,18 @@ loop state stuff lastTime angle = do
     -- game
     newState <- Main.update state dt angle
     render newState stuff angle
-    angle $~! (+ 0.3)
+    angle $~! (+ 10)
+    
+    if countDown == 0
+        then putStrLn $ "FPS: " ++ (show $ 1/dt)
+        else return ()
 
     -- exit if window closed or Esc pressed
     esc <- GLFW.getKey GLFW.ESC
     q <- GLFW.getKey 'Q'
     open <- GLFW.getParam GLFW.Opened
     if open && esc /= GLFW.Press && q /= GLFW.Press
-        then loop newState stuff now angle
+        then loop newState stuff now angle ((countDown-1) `mod` 60)
         --then loop state stuff now angle
         else return ()
 
@@ -249,21 +271,20 @@ main = do
                                        GLFW.DisplayDepthBits 24] GLFW.Window
     -- init
     let state = makeInitState
+    -- capture initial position of mouse and use it as the reference point for calculation of rotation
     Position mouseX mouseY <- get GLFW.mousePos
-    print (mouseX, mouseY)
-    let state' = state { mouseCenter = (mouseX, mouseY) }
     stuff <- initGL
     -- setup stuff
     GLFW.swapInterval       $= 1 -- vsync
     GLFW.windowTitle        $= "Test"
     GLFW.windowSizeCallback $= resize
-    --GLFW.mousePos $= Position 400 300
+    GLFW.mousePos $= Position 0 0
     GLFW.disableSpecial GLFW.MouseCursor
 
     -- main loop
     now <- get GLFW.time
     angle <- newIORef 0
-    loop state stuff (realToFrac now) angle
+    loop state stuff (realToFrac now) angle 60
     
     GLFW.closeWindow
     GLFW.terminate
