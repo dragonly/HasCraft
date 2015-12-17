@@ -55,7 +55,7 @@ makeInitState = State {
         dy = 0.0,
         inventory = [GRASS, STONE, SAND],
         block = STONE,
-        eye = GL.Vertex3 0 0 0
+        eye = GL.Vertex3 0 0 10
     }
 }
 
@@ -204,8 +204,8 @@ update state dt angle = do
 
         dx = mouseX - mousePosLastX
         dy = mouseY - mousePosLastY
-        deltaAlpha = (fromIntegral dx) * pi / 400
-        deltaBeta = (fromIntegral dy) * pi/2 /300
+        deltaAlpha = (fromIntegral dx) * pi / 400 /(realToFrac dt)/60
+        deltaBeta = (fromIntegral dy) * pi/2 /300 /(realToFrac dt)/60
         --beta = -(max (-(pi/2)) $ min (pi/2) beta')
         alpha = (alpha0 + deltaAlpha) `mod'` (2*pi)
         beta = (max (-(pi/2)) $ min (pi/2) (beta0 - deltaBeta))
@@ -213,7 +213,7 @@ update state dt angle = do
         (tgX, tgY, tgZ) = getSightVector (alpha, beta)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (tgX, tgY, tgZ)
 
-        motionScale = 0.2
+        motionScale = 0.2 /(realToFrac dt)/60
         deltaW = GL.Vertex3 (tgX*motionScale) (tgY*motionScale) (tgZ*motionScale)
         deltaS = GL.Vertex3 (-(tgX*motionScale)) (-(tgY*motionScale)) (-(tgZ*motionScale))
         deltaA = GL.Vertex3 (crossX*motionScale) (crossY*motionScale) (crossZ*motionScale)
@@ -246,7 +246,7 @@ loop state stuff lastTime angle countDown = do
     -- game
     newState <- Main.update state dt angle
     render newState stuff angle
-    angle $~! (+ 10)
+    angle $~! (+ 0)
     
     if countDown == 0
         then putStrLn $ "FPS: " ++ (show $ 1/dt)
