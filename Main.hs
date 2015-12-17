@@ -26,12 +26,12 @@ data Player = Player {
     flying :: Bool,
     strafe :: (Int, Int),
     pos :: (Int, Int, Int),
-    --rotation :: IO (IORef (Float, Float)),
+    rotation :: (Float, Float),
     sector :: (Int, Int, Int),
     dy :: Float,
     inventory :: [TexIndex],
-    block :: TexIndex
-    --eye :: GL.Vertex3 GL.GLdouble
+    block :: TexIndex,
+    eye :: GL.Vertex3 GL.GLdouble
 }
 
 data State = State {
@@ -50,12 +50,12 @@ makeInitState = State {
         flying = False,
         strafe = (0, 0),
         pos = (0, 0, 0),
-        --rotation = newIORef (0.0, 0.0),
+        rotation = (0.0, 0.0),
         sector = (0, 0, 0),
         dy = 0.0,
         inventory = [GRASS, STONE, SAND],
-        block = STONE
-        --eye = GL.Vertex3 0 0 10
+        block = STONE,
+        eye = GL.Vertex3 0 0 10
     }
 }
 
@@ -244,23 +244,42 @@ checkWASD rotation position = do
 
     --return ()
 
+update state dt angle = do
+    mousePosition <- get GLFW.mousePos
+    let (mouseX, mouseY) = Position mousePosition
+        player' = player state
+        dx = mouseX - 400
+        dy = mouseY - 300
+        mouseX' = (fromIntegral dx) * 180 / 400 / 100
+        yy = (fromIntegral dy) * 90 / 300 / 100
+        mouseY' = max (-90) $ min 90 yy
+        rotation' = (mouseX', (-mouseY'))
+
+    return state { player = player' { rotation = rotation'
+
+                                    }
+                 }
+
 
 --loop :: State -> GLStuff -> Float -> IORef GLfloat -> IO ()
-loop state stuff lastTime angle rotation position = do
+loop state stuff lastTime angle = do
     -- dt
     nowD <- get time
     let now = realToFrac nowD
     let dt = realToFrac $ now - lastTime
 
     -- game
-    --newState <- update state dt
-    --render newState stuff
-    render state stuff angle rotation position
+    newState <- Main.update state dt angle
+    render newState stuff angle
+    --render state stuff angle rotation position
     angle $~! (+ 0.3)
+
+    --checkWASD rotation position
 
     -- exit if window closed or Esc pressed
 
-    checkWASD rotation position
+    --mouse <- get GLFW.mousePos
+    --print mouse
 
     esc <- GLFW.getKey GLFW.ESC
     q <- GLFW.getKey 'Q'
@@ -276,8 +295,8 @@ main = do
     GLFW.initialize
     -- open window
     GLFW.openWindow (GL.Size 800 600) [GLFW.DisplayRGBBits 8 8 8,
-                                     GLFW.DisplayAlphaBits 8,
-                                     GLFW.DisplayDepthBits 24] GLFW.Window
+                                       GLFW.DisplayAlphaBits 8,
+                                       GLFW.DisplayDepthBits 24] GLFW.Window
     -- init
     let state = makeInitState
     stuff <- initGL
@@ -293,8 +312,8 @@ main = do
     angle <- newIORef 0
     rotation <- newIORef (0, 0)
     position <- newIORef (0, 0, 10)
-    addMouseHandler rotation position
-    loop state stuff (realToFrac now) angle rotation position
+    --addMouseHandler rotation position
+    loop state stuff (realToFrac now) angle
     -- position exit
     GLFW.closeWindow
     GLFW.terminate
