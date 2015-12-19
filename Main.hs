@@ -20,7 +20,7 @@ data GLStuff = GLStuff {
     grass_bot :: GL.TextureObject,
     grass_sid :: GL.TextureObject
 }
-data TexIndex = GRASS | STONE | SAND | GRASS_TOP | GRASS_BOT | GRASS_SID
+data TexIndex = BRICK | STONE | SAND | GRASS deriving (Eq, Show)
 
 data Player = Player {
     flying :: Bool,
@@ -43,19 +43,19 @@ data State = State {
 
 makeInitState :: State
 makeInitState = State {
-    world = Map.fromList [],
+    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-1]],
     shown = Map.fromList [],
     sectors = fromList [],
     mousePosLast = (0, 0),
     player = Player {
         flying = False,
         strafe = (0, 0),
-        rotation = (0.0, 0.0),
+        rotation = (0, 0),
         sector = (0, 0, 0),
         dy = 0.0,
         inventory = [GRASS, STONE, SAND],
         block = STONE,
-        eye = GL.Vertex3 0 0 10
+        eye = GL.Vertex3 0 10 10
     }
 }
 
@@ -111,7 +111,8 @@ drawAxis = do
 
 render :: State -> GLStuff -> IORef GLfloat -> IO ()
 render state stuff angle = do
-    let player0 = player state
+    let state0 = state
+        player0 = player state0
         (alpha, beta) = rotation player0
         eye0 = eye player0
     GL.clear [GL.ColorBuffer, GL.DepthBuffer]
@@ -124,13 +125,35 @@ render state stuff angle = do
 
     GLU.lookAt eye0 target (GL.Vector3 0.0 1.0 0.0)
     
+    -- render stone floor
+    forM_ (Map.toList $ world state0) $ \((x,y,z), textureIndex) ->
+        GL.preservingMatrix $ do
+            GL.translate $ (GL.Vector3 (realToFrac x) (realToFrac y) (realToFrac z) :: GL.Vector3 GL.GLfloat)
+            case textureIndex of
+                BRICK -> GL.textureBinding GL.Texture2D $= Just (brick stuff)
+                STONE -> GL.textureBinding GL.Texture2D $= Just (stone stuff)
+                SAND -> GL.textureBinding GL.Texture2D $= Just (sand stuff)
+                GRASS -> GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+            if textureIndex == BRICK || textureIndex == STONE || textureIndex == SAND
+                then do
+                    drawCubeSide
+                    drawCubeTop
+                    drawCubeBot
+                else do
+                    drawCubeSide
+                    GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+                    drawCubeTop
+                    GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+                    drawCubeBot
+
+    -- render THREE BODIES
     a <- get angle
 
     GL.preservingMatrix $ do
         GL.rotate a $ GL.Vector3 1 0 (0::GL.GLfloat)
-        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (Vector3 0 10 0 :: Vector3 GLfloat)
+        GL.translate $ (GL.Vector3 0 3 0 :: GL.Vector3 GL.GLfloat)
 
         GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
         drawCubeSide
@@ -140,9 +163,9 @@ render state stuff angle = do
         drawCubeBot
     GL.preservingMatrix $ do
         GL.rotate (a-1) $ GL.Vector3 0 1 (0::GL.GLfloat)
-        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (Vector3 0 0 10 :: Vector3 GLfloat)
+        GL.translate $ (GL.Vector3 0 0 3 :: GL.Vector3 GL.GLfloat)
 
         GL.textureBinding GL.Texture2D $= Just (brick stuff)
         drawCubeSide
@@ -150,9 +173,9 @@ render state stuff angle = do
         drawCubeBot
     GL.preservingMatrix $ do
         GL.rotate (a-2) $ GL.Vector3 0 0 (1::GL.GLfloat)
-        GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (Vector3 10 0 0 :: Vector3 GLfloat)
+        GL.translate $ (GL.Vector3 3 0 0 :: GL.Vector3 GL.GLfloat)
 
         GL.textureBinding GL.Texture2D $= Just (sand stuff)
         drawCubeSide
@@ -163,8 +186,8 @@ render state stuff angle = do
 
     GLFW.swapBuffers
 
-getSightVector (alpha, beta) = 
-    let x = realToFrac $ sin alpha
+getSightVector (alpha, beta) =
+    let x = realToFrac $ (cos beta) * (sin alpha)
         y = realToFrac $ sin beta
         z = realToFrac $ (cos beta) * (-(cos alpha))
     in (x,y,z)
@@ -208,7 +231,7 @@ update state dt angle = do
         deltaBeta = (fromIntegral dy) * pi/2 /300 /(realToFrac dt)/60
         --beta = -(max (-(pi/2)) $ min (pi/2) beta')
         alpha = (alpha0 + deltaAlpha) `mod'` (2*pi)
-        beta = (max (-(pi/2)) $ min (pi/2) (beta0 - deltaBeta))
+        beta = (max (-(pi/2)+0.0000001) $ min (pi/2-0.0000001) (beta0 - deltaBeta))
         rotation' = (alpha,beta)
         (tgX, tgY, tgZ) = getSightVector (alpha, beta)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (tgX, tgY, tgZ)
@@ -228,7 +251,7 @@ update state dt angle = do
         state' = stateSPACE
         eye' = (eye.player) state'
 
-    --print (alpha/pi*180, beta/pi*180)
+    print (alpha/pi*180, beta/pi*180)
     return state { player = player' { rotation = rotation',
                                       eye = eye'
                                     },
@@ -278,7 +301,7 @@ main = do
     GLFW.swapInterval       $= 1 -- vsync
     GLFW.windowTitle        $= "Test"
     GLFW.windowSizeCallback $= resize
-    GLFW.mousePos $= Position 0 0
+    --GLFW.mousePos $= Position 0 0
     GLFW.disableSpecial GLFW.MouseCursor
 
     -- main loop
