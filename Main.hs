@@ -43,7 +43,7 @@ data State = State {
 
 makeInitState :: State
 makeInitState = State {
-    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-1]],
+    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-2]] ++ [((x,y,z), GRASS) | x <- [-8..8], z <- [-8..8], y <- [-1]],
     shown = Map.fromList [],
     sectors = fromList [],
     mousePosLast = (0, 0),
@@ -251,7 +251,7 @@ update state dt angle = do
         state' = stateSPACE
         eye' = (eye.player) state'
 
-    print (alpha/pi*180, beta/pi*180)
+    --print (alpha/pi*180, beta/pi*180)
     return state { player = player' { rotation = rotation',
                                       eye = eye'
                                     },
