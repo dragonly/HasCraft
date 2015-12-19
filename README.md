@@ -14,3 +14,4 @@ ghc Main.hs
 ```
 
 ![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot.png)
+![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot1.png)

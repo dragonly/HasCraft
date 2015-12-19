@@ -27,7 +27,7 @@ data Player = Player {
     strafe :: (Int, Int),
     rotation :: (Float, Float),
     sector :: (Int, Int, Int),
-    dy :: Float,
+    vy :: Float,
     inventory :: [TexIndex],
     block :: TexIndex,
     eye :: GL.Vertex3 GL.GLdouble
@@ -38,21 +38,23 @@ data State = State {
     shown :: Map (Int, Int, Int) TexIndex,
     sectors :: Map (Int, Int, Int) [(Int, Int, Int)],
     mousePosLast :: (GL.GLint, GL.GLint),
+    gravityAcceleration :: GL.GLfloat,
     player :: Player
 }
 
 makeInitState :: State
 makeInitState = State {
-    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-2]] ++ [((x,y,z), GRASS) | x <- [-8..8], z <- [-8..8], y <- [-1]],
+    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-1]],-- ++ [((x,y,z), GRASS) | x <- [-8..8], z <- [-8..8], y <- [-1]],
     shown = Map.fromList [],
     sectors = fromList [],
     mousePosLast = (0, 0),
+    gravityAcceleration = 9.8,
     player = Player {
         flying = False,
         strafe = (0, 0),
         rotation = (0, 0),
         sector = (0, 0, 0),
-        dy = 0.0,
+        vy = 0.0,
         inventory = [GRASS, STONE, SAND],
         block = STONE,
         eye = GL.Vertex3 0 10 10
@@ -98,7 +100,7 @@ resize size@(Size w h) = do
     GL.viewport   $= (Position 0 0, size)
     GL.matrixMode $= GL.Projection
     GL.loadIdentity
-    GLU.perspective 65.0 aspect 1.0 60.0
+    GLU.perspective 65.0 aspect 0.01 60.0
     GL.matrixMode $= GL.Modelview 0
     return ()
 
@@ -225,10 +227,10 @@ update state dt angle = do
         GL.Vertex3 x y z = eye player'
         (alpha0, beta0) = rotation player'
 
-        dx = mouseX - mousePosLastX
-        dy = mouseY - mousePosLastY
-        deltaAlpha = (fromIntegral dx) * pi / 400 /(realToFrac dt)/60
-        deltaBeta = (fromIntegral dy) * pi/2 /300 /(realToFrac dt)/60
+        mouseDx = mouseX - mousePosLastX
+        mouseDy = mouseY - mousePosLastY
+        deltaAlpha = (fromIntegral mouseDx) * pi / 400 /(realToFrac dt)/60
+        deltaBeta = (fromIntegral mouseDy) * pi/2 /300 /(realToFrac dt)/60
         --beta = -(max (-(pi/2)) $ min (pi/2) beta')
         alpha = (alpha0 + deltaAlpha) `mod'` (2*pi)
         beta = (max (-(pi/2)+0.0000001) $ min (pi/2-0.0000001) (beta0 - deltaBeta))
@@ -249,7 +251,15 @@ update state dt angle = do
         stateD = processMotion stateA d deltaD
         stateSPACE = processMotion stateD space deltaSPACE
         state' = stateSPACE
-        eye' = (eye.player) state'
+        GL.Vertex3 eyeX eyeY eyeZ = (eye.player) state'
+        -- apply gravity acceleration
+        g = gravityAcceleration state0
+        dvy = g * dt
+        vy0 = vy player'
+        dy = (vy0 + (max 10 (vy0 + (realToFrac dvy)))) * (realToFrac dt)
+        --eye' = GL.Vertex3 eyeX (eyeY - (realToFrac dy)) eyeZ
+        eye' = GL.Vertex3 eyeX eyeY eyeZ
+
 
     --print (alpha/pi*180, beta/pi*180)
     return state { player = player' { rotation = rotation',
@@ -269,7 +279,7 @@ loop state stuff lastTime angle countDown = do
     -- game
     newState <- Main.update state dt angle
     render newState stuff angle
-    angle $~! (+ 0)
+    angle $~! (+ 0.3)
     
     if countDown == 0
         then putStrLn $ "FPS: " ++ (show $ 1/dt)
@@ -303,6 +313,12 @@ main = do
     GLFW.windowSizeCallback $= resize
     --GLFW.mousePos $= Position 0 0
     GLFW.disableSpecial GLFW.MouseCursor
+
+    -- set up sky and fog
+    GL.clearColor $= GL.Color4 0.5 0.69 1.0 1
+    GL.textureFilter GL.Texture2D $= ((GL.Linear', Nothing), GL.Linear') 
+    GL.fogColor $= GL.Color4 0.5 0.69 1.0 1
+    GL.fogMode $= GL.Linear 5 60
 
     -- main loop
     now <- get GLFW.time
