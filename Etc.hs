@@ -81,5 +81,5 @@ loadTexture filename = do
     [texName] <- GL.genObjectNames 1
     GL.textureBinding Texture2D $= Just texName
     GLFW.loadTexture2D dataFileName [GLFW.BuildMipMaps]
-    GL.textureFilter Texture2D $= ((GL.Linear', Just GL.Linear'), GL.Linear') -- trilinear filtering
+    GL.textureFilter Texture2D $= ((GL.Linear', Just GL.Linear'), GL.Linear')
     return texName

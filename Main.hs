@@ -4,7 +4,6 @@ import Graphics.Rendering.OpenGL.GL as GL
 import Graphics.Rendering.OpenGL.GLU as GLU
 import Graphics.UI.GLFW as GLFW
 import Graphics.Rendering.OpenGL (($=))
---import Graphics.DynamicGraph.Aixs
 import Control.Monad
 import Data.Map as Map
 import Data.IORef as IORef
@@ -13,9 +12,9 @@ import Data.Fixed
 import Etc
 
 data GLStuff = GLStuff {
-    brick  :: GL.TextureObject,
+    brick :: GL.TextureObject,
     stone :: GL.TextureObject,
-    sand    :: GL.TextureObject,
+    sand :: GL.TextureObject,
     grass_top :: GL.TextureObject,
     grass_bot :: GL.TextureObject,
     grass_sid :: GL.TextureObject
@@ -23,20 +22,15 @@ data GLStuff = GLStuff {
 data TexIndex = BRICK | STONE | SAND | GRASS deriving (Eq, Show)
 
 data Player = Player {
-    flying :: Bool,
-    strafe :: (Int, Int),
     rotation :: (Float, Float),
-    sector :: (Int, Int, Int),
     vy :: Float,
-    inventory :: [TexIndex],
-    block :: TexIndex,
+    jump :: Bool,
     eye :: GL.Vertex3 GL.GLdouble
 }
 
 data State = State {
     world :: Map (Int, Int, Int) TexIndex,
     shown :: Map (Int, Int, Int) TexIndex,
-    sectors :: Map (Int, Int, Int) [(Int, Int, Int)],
     mousePosLast :: (GL.GLint, GL.GLint),
     gravityAcceleration :: GL.GLfloat,
     player :: Player
@@ -44,20 +38,34 @@ data State = State {
 
 makeInitState :: State
 makeInitState = State {
-    world = Map.fromList $ [((x,y,z), STONE) | x <- [-8..8], z <- [-8..8], y <- [-1]],-- ++ [((x,y,z), GRASS) | x <- [-8..8], z <- [-8..8], y <- [-1]],
+    world = Map.fromList $  [((x,y,z), GRASS) | x <- [-10..10], z <- [-10..10], y <- [-1]] ++
+                            [((x,y,z), STONE) | x <- [-10, 10], z <- [-10, 10], y <- [0..20]] ++ 
+                            [((x,y,z), SAND) | x <- [-10, -9, 9, 10], z <- [-10..10], y <- [-1]] ++ 
+                            [((x,y,z), SAND) | x <- [-10..10], z <- [-10, -9, 9, 10], y <- [-1]] ++ 
+                            [((x,y,z), STONE) | x <- [-8..2], z <- [-8..2], y <- [0]] ++
+                            [((x,y,z), GRASS) | x <- [-7..1], z <- [-7..1], y <- [1]] ++
+                            [((x,y,z), STONE) | x <- [-6..0], z <- [-6..0], y <- [2]] ++
+                            [((x,y,z), GRASS) | x <- [-5..(-1)], z <- [-5..(-1)], y <- [3]] ++
+                            [((x,y,z), STONE) | x <- [-4..(-2)], z <- [-4..(-2)], y <- [4]] ++
+                            [((x,y,z), GRASS) | x <- [-3], z <- [-3], y <- [5]] ++
+                            [((x,y,z), BRICK) | x <- [-10, -9, 9, 10], z <- [-10, -9, 9, 10], y <- [21]] ++
+                            [((x,y,z), BRICK) | x <- [-9, -8, 8, 9], z <- [-9, -8, 8, 9], y <- [22]] ++
+                            [((x,y,z), BRICK) | x <- [-8, -7, 7, 8], z <- [-8, -7, 7, 8], y <- [23]] ++
+                            [((x,y,z), BRICK) | x <- [-7, -6, 6, 7], z <- [-7, -6, 6, 7], y <- [24]] ++
+                            [((x,y,z), BRICK) | x <- [-6, -5, 5, 6], z <- [-6, -5, 5, 6], y <- [25]] ++
+                            [((x,y,z), BRICK) | x <- [-5, -4, 4, 5], z <- [-5, -4, 4, 5], y <- [26]] ++
+                            [((x,y,z), BRICK) | x <- [-4, -3, 3, 4], z <- [-4, -3, 3, 4], y <- [27]] ++
+                            [((x,y,z), BRICK) | x <- [-3, -2, 2, 3], z <- [-3, -2, 2, 3], y <- [28]] ++
+                            [((x,y,z), BRICK) | x <- [-2, -1, 1, 2], z <- [-2, -1, 1, 2], y <- [29]] ++
+                            [((x,y,z), BRICK) | x <- [-1..1], z <- [-1..1], y <- [29]],
     shown = Map.fromList [],
-    sectors = fromList [],
     mousePosLast = (0, 0),
-    gravityAcceleration = 9.8,
+    gravityAcceleration = 4.0,
     player = Player {
-        flying = False,
-        strafe = (0, 0),
         rotation = (0, 0),
-        sector = (0, 0, 0),
         vy = 0.0,
-        inventory = [GRASS, STONE, SAND],
-        block = STONE,
-        eye = GL.Vertex3 0 10 10
+        jump = True,
+        eye = GL.Vertex3 0 10 0
     }
 }
 
@@ -201,17 +209,88 @@ getCrossProduct (x1, y1, z1) (x2, y2, z2) =
     in
         (x, y, z)
 
+checkCollision :: State -> GL.Vertex3 GL.GLdouble -> State
+checkCollision state delta = 
+    let world' = world state
+        player' = player state
+        GL.Vertex3 px py pz = eye player'
+        GL.Vertex3 dx dy dz = delta
+        (cx, cy, cz) = (floor px, floor py, floor pz) :: (Int, Int, Int)
+
+        ux :: Int
+            | dx == 0 = 0
+            | dx > 0 = 1
+            | otherwise = -1
+        uy :: Int
+            | dy == 0 = 0
+            | dy > 0 = 1
+            | otherwise = -1
+        uz :: Int
+            | dz == 0 = 0
+            | dz > 0 = 1
+            | otherwise = -1
+
+        eye' = GL.Vertex3 nx ny nz
+
+        nx
+            | Map.lookup (cx + ux, cy, cz) world' == Nothing = px + dx
+            | ux == 1 = realToFrac cx + realToFrac ux - 1
+            | ux == -1 = realToFrac cx + realToFrac ux + 1 + 1
+            | otherwise = px 
+        ny 
+            | Map.lookup (cx, cy + uy, cz) world' == Nothing = py + dy
+            | uy == 1 = realToFrac cy + realToFrac uy - 1
+            | uy == -1 = realToFrac cy + realToFrac uy + 1 + 1
+            | otherwise = py
+
+        nz    
+            | Map.lookup (cx, cy, cz + uz) world' == Nothing = pz + dz
+            | uz == 1 = realToFrac cz + realToFrac uz - 1
+            | uz == -1 = realToFrac cz + realToFrac uz + 1 + 1
+            | otherwise = pz
+        vy0 = vy player'
+        vy'
+            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 = 0
+            | otherwise = vy0
+        jump'
+            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 = False
+            | otherwise = True
+    in 
+        state { player = player' {eye = eye', vy = vy', jump = jump'} }
+
 processMotion :: State -> GLFW.KeyButtonState -> GL.Vertex3 GL.GLdouble -> State
 processMotion state key delta = 
+    if key == GLFW.Press
+        then
+            checkCollision state delta
+        else
+            state
+
+processJump :: State -> GLFW.KeyButtonState -> State
+processJump state key =
     let player' = player state
-        eye0 = eye player'
-        eye' = (+) <$> eye0 <*> delta
+        jump' = jump player'
     in
-        if key == GLFW.Press
-            then
-                state { player = player' { eye = eye' } }
-            else
+        if key == GLFW.Press && jump' == False
+            then 
+                state { player = player' {vy = 2.0}}
+            else 
                 state
+
+processGravity :: State -> GL.GLfloat -> State
+processGravity state dt =
+    let player' = player state
+        GL.Vertex3 eyeX eyeY eyeZ = (eye.player) state
+        g = gravityAcceleration state
+        dvy = g * dt --down
+        vy0 = vy player' --up
+        vy' = realToFrac (max (-10) (vy0 - (realToFrac dvy))) --up
+        dy = (vy0 + vy') * (realToFrac dt) --up
+        delta = GL.Vertex3 0 (realToFrac dy) 0
+        state' = state { player = player' {vy = vy'} }
+    in
+        checkCollision state' delta
+
 
 update :: State -> GL.GLfloat -> IORef GL.GLfloat -> IO State
 update state dt angle = do
@@ -238,36 +317,27 @@ update state dt angle = do
         (tgX, tgY, tgZ) = getSightVector (alpha, beta)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (tgX, tgY, tgZ)
 
-        motionScale = 0.2 /(realToFrac dt)/60
+        motionScale = 0.06 /(realToFrac dt)/60
         deltaW = GL.Vertex3 (tgX*motionScale) (tgY*motionScale) (tgZ*motionScale)
         deltaS = GL.Vertex3 (-(tgX*motionScale)) (-(tgY*motionScale)) (-(tgZ*motionScale))
         deltaA = GL.Vertex3 (crossX*motionScale) (crossY*motionScale) (crossZ*motionScale)
         deltaD = GL.Vertex3 (-(crossX*motionScale)) (-(crossY*motionScale)) (-(crossZ*motionScale))
-        deltaSPACE = GL.Vertex3 0 0.1 0
+        --deltaSPACE = GL.Vertex3 0 0.1 0
 
         stateW = processMotion state0 w deltaW
         stateS = processMotion stateW s deltaS
         stateA = processMotion stateS a deltaA
         stateD = processMotion stateA d deltaD
-        stateSPACE = processMotion stateD space deltaSPACE
-        state' = stateSPACE
-        GL.Vertex3 eyeX eyeY eyeZ = (eye.player) state'
-        -- apply gravity acceleration
-        g = gravityAcceleration state0
-        dvy = g * dt
-        vy0 = vy player'
-        dy = (vy0 + (max 10 (vy0 + (realToFrac dvy)))) * (realToFrac dt)
-        --eye' = GL.Vertex3 eyeX (eyeY - (realToFrac dy)) eyeZ
-        eye' = GL.Vertex3 eyeX eyeY eyeZ
 
+        stateSPACE = processJump stateD space
 
-    --print (alpha/pi*180, beta/pi*180)
-    return state { player = player' { rotation = rotation',
-                                      eye = eye'
-                                    },
-                   mousePosLast = (mouseX, mouseY)
-                 }
-
+        stateG = processGravity stateSPACE dt
+        playerF = player stateG
+     
+    return state {
+        player = playerF { rotation = rotation' },
+        mousePosLast = (mouseX, mouseY)
+    }
 
 loop :: State -> GLStuff -> Float -> IORef GLfloat -> Int -> IO ()
 loop state stuff lastTime angle countDown = do
@@ -311,7 +381,6 @@ main = do
     GLFW.swapInterval       $= 1 -- vsync
     GLFW.windowTitle        $= "Test"
     GLFW.windowSizeCallback $= resize
-    --GLFW.mousePos $= Position 0 0
     GLFW.disableSpecial GLFW.MouseCursor
 
     -- set up sky and fog
