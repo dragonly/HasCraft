@@ -329,6 +329,8 @@ update state dt angle = do
         stateA = processMotion stateS a deltaA
         stateD = processMotion stateA d deltaD
 
+    print $ (jump.player) stateD
+    let
         stateSPACE = processJump stateD space
 
         stateG = processGravity stateSPACE dt
