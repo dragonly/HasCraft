@@ -24,6 +24,8 @@ data TexIndex = BRICK | STONE | SAND | GRASS deriving (Eq, Show)
 data Player = Player {
     rotation :: (Float, Float),
     vy :: Float,
+    vx :: Float,
+    vz :: Float,
     jump :: Bool,
     eye :: GL.Vertex3 GL.GLdouble
 }
@@ -64,8 +66,10 @@ makeInitState = State {
     player = Player {
         rotation = (0, 0),
         vy = 0.0,
+        vx = 0.0,
+        vz = 0.0,
         jump = True,
-        eye = GL.Vertex3 0 10 0
+        eye = GL.Vertex3 (-3) 10 (-3)
     }
 }
 
@@ -280,7 +284,7 @@ checkCollision state delta onkey =
         player' = player state
         GL.Vertex3 px py pz = eye player'
         GL.Vertex3 dx dy dz = delta
-        (cx, cy, cz) = (floor px, floor py, floor pz) :: (Int, Int, Int)
+        (cx, cy, cz) = (floor (px - 0.000001), floor py, floor (pz - 0.000001)) :: (Int, Int, Int)
 
         ux :: Int
             | dx == 0 = 0
@@ -299,27 +303,27 @@ checkCollision state delta onkey =
 
         nx
             | Map.lookup (cx + ux, cy, cz) world' == Nothing = px + dx
-            | ux == 1 = min (realToFrac cx + 0.5) (px + dx)
+            | ux == 1 = min (realToFrac cx + realToFrac ux - 0.5) (px + dx)
             | ux == -1 = max (realToFrac cx + 0.5) (px + dx)
             | otherwise = px 
         ny 
             | onkey == True = py
             | Map.lookup (cx, cy + uy, cz) world' == Nothing = py + dy
-            | uy == 1 = min (realToFrac cy + 0.5) (py + dy)
+            | uy == 1 = min (realToFrac cy + realToFrac uy - 0.5) (py + dy)
             | uy == -1 = max (realToFrac cy + 0.5) (py + dy) 
             | otherwise = py
 
         nz    
             | Map.lookup (cx, cy, cz + uz) world' == Nothing = pz + dz
-            | uz == 1 = min (realToFrac cz + 0.5) (pz + dz)
+            | uz == 1 = min (realToFrac cz + realToFrac uz - 0.5) (pz + dz)
             | uz == -1 = max (realToFrac cz + 0.5) (pz + dz)
             | otherwise = pz
         vy0 = vy player'
         vy'
-            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 = 0
+            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 && (py - realToFrac cy) < 0.500001 = 0
             | otherwise = vy0
         jump'
-            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 = False
+            | Map.lookup (cx, cy + uy, cz) world' /= Nothing && uy == -1 && (py - realToFrac cy) < 0.500001 = False
             | otherwise = True
     in 
         state { player = player' {eye = eye', vy = vy', jump = jump'} }
@@ -341,7 +345,7 @@ processJump state key =
     in
         if key == GLFW.Press && jump' == False
             then 
-                state { player = player' {vy = 2.0}}
+                state { player = player' {vy = 2.5}}
             else 
                 state
 
@@ -352,7 +356,7 @@ processGravity state dt =
         g = gravityAcceleration state
         dvy = g * dt --down
         vy0 = vy player' --up
-        vy' = realToFrac (max (-10) (vy0 - (realToFrac dvy))) --up
+        vy' = realToFrac (max (-5) (vy0 - (realToFrac dvy))) --up
         dy = (vy0 + vy') * (realToFrac dt) --up
         delta = GL.Vertex3 0 (realToFrac dy) 0
         state' = state { player = player' {vy = vy'} }
