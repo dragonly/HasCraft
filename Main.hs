@@ -163,7 +163,7 @@ render state stuff angle = do
         GL.rotate a $ GL.Vector3 1 0 (0::GL.GLfloat)
         --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (GL.Vector3 0 3 0 :: GL.Vector3 GL.GLfloat)
+        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
 
         GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
         drawCubeSide
@@ -172,24 +172,89 @@ render state stuff angle = do
         GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
         drawCubeBot
     GL.preservingMatrix $ do
-        GL.rotate (a-1) $ GL.Vector3 0 1 (0::GL.GLfloat)
+        GL.rotate (a-90) $ GL.Vector3 1 0 (0::GL.GLfloat)
         --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (GL.Vector3 0 0 3 :: GL.Vector3 GL.GLfloat)
+        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
 
-        GL.textureBinding GL.Texture2D $= Just (brick stuff)
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
         drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
         drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
         drawCubeBot
     GL.preservingMatrix $ do
-        GL.rotate (a-2) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        GL.rotate (a-180) $ GL.Vector3 1 0 (0::GL.GLfloat)
         --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
 
-        GL.translate $ (GL.Vector3 3 0 0 :: GL.Vector3 GL.GLfloat)
+        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
 
-        GL.textureBinding GL.Texture2D $= Just (sand stuff)
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
         drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
         drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
+    GL.preservingMatrix $ do
+        GL.rotate (a-270) $ GL.Vector3 1 0 (0::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
+
+    GL.preservingMatrix $ do
+        GL.rotate (a-45) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
+    GL.preservingMatrix $ do
+        GL.rotate (a-135) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
+    GL.preservingMatrix $ do
+        GL.rotate (a-225) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+        drawCubeBot
+    GL.preservingMatrix $ do
+        GL.rotate (a-315) $ GL.Vector3 0 0 (1::GL.GLfloat)
+        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
+
+        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
+
+        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
+        drawCubeSide
+        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+        drawCubeTop
+        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
         drawCubeBot
 
     --drawAxis
@@ -209,8 +274,8 @@ getCrossProduct (x1, y1, z1) (x2, y2, z2) =
     in
         (x, y, z)
 
-checkCollision :: State -> GL.Vertex3 GL.GLdouble -> State
-checkCollision state delta = 
+checkCollision :: State -> GL.Vertex3 GL.GLdouble -> Bool -> State
+checkCollision state delta onkey = 
     let world' = world state
         player' = player state
         GL.Vertex3 px py pz = eye player'
@@ -234,19 +299,20 @@ checkCollision state delta =
 
         nx
             | Map.lookup (cx + ux, cy, cz) world' == Nothing = px + dx
-            | ux == 1 = realToFrac cx + realToFrac ux - 1
-            | ux == -1 = realToFrac cx + realToFrac ux + 1 + 1
+            | ux == 1 = min (realToFrac cx + 0.5) (px + dx)
+            | ux == -1 = max (realToFrac cx + 0.5) (px + dx)
             | otherwise = px 
         ny 
+            | onkey == True = py
             | Map.lookup (cx, cy + uy, cz) world' == Nothing = py + dy
-            | uy == 1 = realToFrac cy + realToFrac uy - 1
-            | uy == -1 = realToFrac cy + realToFrac uy + 1 + 1
+            | uy == 1 = min (realToFrac cy + 0.5) (py + dy)
+            | uy == -1 = max (realToFrac cy + 0.5) (py + dy) 
             | otherwise = py
 
         nz    
             | Map.lookup (cx, cy, cz + uz) world' == Nothing = pz + dz
-            | uz == 1 = realToFrac cz + realToFrac uz - 1
-            | uz == -1 = realToFrac cz + realToFrac uz + 1 + 1
+            | uz == 1 = min (realToFrac cz + 0.5) (pz + dz)
+            | uz == -1 = max (realToFrac cz + 0.5) (pz + dz)
             | otherwise = pz
         vy0 = vy player'
         vy'
@@ -260,11 +326,13 @@ checkCollision state delta =
 
 processMotion :: State -> GLFW.KeyButtonState -> GL.Vertex3 GL.GLdouble -> State
 processMotion state key delta = 
-    if key == GLFW.Press
-        then
-            checkCollision state delta
-        else
-            state
+    let jump' = (jump.player) state
+    in
+        if key == GLFW.Press && jump' == False
+            then
+                checkCollision state delta True
+            else
+                state
 
 processJump :: State -> GLFW.KeyButtonState -> State
 processJump state key =
@@ -289,7 +357,7 @@ processGravity state dt =
         delta = GL.Vertex3 0 (realToFrac dy) 0
         state' = state { player = player' {vy = vy'} }
     in
-        checkCollision state' delta
+        checkCollision state' delta False
 
 
 update :: State -> GL.GLfloat -> IORef GL.GLfloat -> IO State
@@ -381,7 +449,7 @@ main = do
     stuff <- initGL
     -- setup stuff
     GLFW.swapInterval       $= 1 -- vsync
-    GLFW.windowTitle        $= "Test"
+    GLFW.windowTitle        $= "HasCraft"
     GLFW.windowSizeCallback $= resize
     GLFW.disableSpecial GLFW.MouseCursor
 
