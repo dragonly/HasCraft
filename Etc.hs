@@ -9,18 +9,37 @@ t u v   = GL.texCoord (GL.TexCoord2 u v :: GL.TexCoord2 GLfloat)
 
 drawFrame :: IO ()
 drawFrame = do
+    GL.clearColor $= GL.Color4 0 0 0 0
     renderPrimitive LineLoop $ do
-        GL.clearColor $= GL.Color4 0 0 0 0
 
+        --v 0 0 0
+        --v 1 0 0
+        --v 1 0 1
+        --v 0 0 1
+
+        --v 0 0 1
+        --v 1 0 1
+        --v 1 1 1
+        --v 0 1 1
+        v 1 1 0
+        v 0 1 0
         v 0 0 0
         v 1 0 0
+
+        v 0 1 1
+        v 1 1 1
         v 1 0 1
+        v 0 0 1
+
+        v 0 1 0
+        v 0 1 1
         v 0 0 1
         v 0 0 0
-        v 0 0 1
-        v 1 0 1
+        
         v 1 1 1
-        v 0 1 1
+        v 1 1 0
+        v 1 0 0
+        v 1 0 1
 
 drawCubeSide :: IO ()
 drawCubeSide = renderPrimitive Quads $ do

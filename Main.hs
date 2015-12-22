@@ -20,6 +20,10 @@ data GLTexture = GLTexture {
     grass_sid :: GL.TextureObject
 }
 data TexIndex = BRICK | STONE | SAND | GRASS deriving (Eq, Show)
+portal1 :: ((Int, Int, Int), (Int, Int, Int))
+portal1 = ((8, (-14), (-3)), (15, 101+4, 0))
+portal2 :: ((Int, Int, Int), (Int, Int, Int))
+portal2 = ((24, 101, 0), ((-3), (-14)+4, (-3)))
 
 data Player = Player {
     rotation :: (Float, Float),
@@ -170,12 +174,22 @@ resize size@(Size w h) = do
 --            mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
 --                [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
 
-putStuff :: TexIndex -> GLTexture -> GL.Vector3 GL.GLfloat -> IORef GLfloat -> GL.Vector3 GL.GLfloat -> GL.Vector3 GL.GLfloat -> IO ()
-putStuff texture stuff translateBeforeRotateVector angle rotateVector translateAfterRotateVector = do
+putBlock state =
+    let
+        focusPos = focus state
+        world0 = world state
+        world' = Map.insert focusPos BRICK world0
+    in
+        state {
+            world = world'
+        }
+
+putStuff :: TexIndex -> GLTexture -> GL.Vector3 GL.GLfloat -> GLfloat -> GL.Vector3 GL.GLfloat -> GL.Vector3 GL.GLfloat -> IO ()
+putStuff texture stuff translateBeforeRotateVector rotateAngle rotateVector translateAfterRotateVector = do
     GL.preservingMatrix $ do
         GL.translate $ translateBeforeRotateVector
 
-        rotateAngle <- get angle
+        --rotateAngle <- get angle
 
         GL.rotate rotateAngle $ rotateVector
 
@@ -217,7 +231,7 @@ render state stuff angle = do
 
     GLU.lookAt eye0 target (GL.Vector3 0.0 1.0 0.0)
     
-    -- render stone floor
+    -- render world
     forM_ (Map.toList $ world state0) $ \((x,y,z), textureIndex) ->
         GL.preservingMatrix $ do
             GL.translate $ (GL.Vector3 (realToFrac x) (realToFrac y) (realToFrac z) :: GL.Vector3 GL.GLfloat)
@@ -237,10 +251,21 @@ render state stuff angle = do
                     drawCubeTop
                     GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
                     drawCubeBot
+    -- render focus frame
+    --GL.preservingMatrix $ do
+    --    GL.translate $ (GL.Vector3 (realToFrac focusX) (realToFrac focusY) (realToFrac focusZ) :: GL.Vector3 GL.GLfloat)
+    --    GL.scale 1.06 1.06 (1.06 :: GLfloat)
+    --    drawFrame
 
-    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 1 0 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 5 0 :: GL.Vector3 GL.GLfloat)
-    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 0 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 0 5 :: GL.Vector3 GL.GLfloat)
-    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 0 0 1 :: GL.Vector3 GL.GLfloat) (GL.Vector3 5 0 0 :: GL.Vector3 GL.GLfloat)
+    rotateAngle <- get angle
+
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) rotateAngle (GL.Vector3 1 0 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 5 0 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) rotateAngle (GL.Vector3 0 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 0 5 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) rotateAngle (GL.Vector3 0 0 1 :: GL.Vector3 GL.GLfloat) (GL.Vector3 5 0 0 :: GL.Vector3 GL.GLfloat)
+
+    putStuff GRASS stuff (GL.Vector3 0 12 0 :: GL.Vector3 GL.GLfloat) (2*rotateAngle) (GL.Vector3 0.3 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 20 0 0 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 15 0 :: GL.Vector3 GL.GLfloat) (6*rotateAngle) (GL.Vector3 (-0.3) 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 28 0 0 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 18 0 :: GL.Vector3 GL.GLfloat) (-4*rotateAngle) (GL.Vector3 0.15 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 24 0 0 :: GL.Vector3 GL.GLfloat)
 
     GLFW.swapBuffers
 
@@ -391,13 +416,32 @@ applyMovement state dt =
             }
         }
 
---hitTest :: State -> (GL.GLdouble, GL.GLdouble, GL.GLdouble) -> State
---hitTest state posVector sightVector =
-    --let
-    --    world0 = world state
-    --    (key, prev) = _hitTest world0 (realToFrac 1) posVector posVector sightVector
-    --in
-    --    state
+--hitTest :: State -> ((Int, Int, Int), (Int, Int, Int))
+--hitTest state =
+--    let
+--        world0 = world state
+--        GL.Vertex3 eyeX eyeY eyeZ = (eye.player) state
+--        (alpha, beta) = (rotation.player) state
+--        (sightX, sightY, sightZ) = getSightVector (alpha, beta)
+--        (blockX, blockY, blockZ) = (floor eyeX, floor eyeY, floor eyeZ)
+--        (key, prev) = _hitTest world0 (eyeX, eyeY, eyeZ) (sightX, sightY,sightZ) (blockX, blockY, blockZ) (realToFrac 1) 24
+--    in
+--        (key, prev)
+
+--_hitTest world (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) (prevX, prevY, prevZ) step maxStep =
+--    let
+--        (testX, testY, testZ) = (eyeX+sightX*step/8, eyeY+sightX*step/8, eyeZ+sightX*step/8)
+--        (blockX, blockY, blockZ) = (floor testX, floor testY, floor testZ)
+--    in
+--        -- if exceeded max tange then return
+--        if step > maxStep then ((999,999,999), (prevX, prevY, prevZ))
+--            -- haven't gone out of current block
+--            else if (blockX, blockY, blockZ) == (prevX, prevY, prevZ) then _hitTest world (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) (prevX, prevY, prevZ) (step+1) maxStep
+--            -- enter a new block, check if in world
+--                else if Map.lookup (blockX, blockY, blockZ) world /= Nothing then ((blockX, blockY, blockZ), (prevX, prevY, prevZ))
+--                    -- or go on another step test, make this new block the `previous block`
+--                    else _hitTest world (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) (blockX, blockY, blockZ) (step+1) maxStep
+
 
 --_hitTest :: World -> Float -> (Float, Float, Float) -> (Float, Float, Float) -> ((Int, Int, Int), (Int, Int, Int))
 --_hitTest world step (prevX, prevY, prevZ) (posX, posY, posZ) (sightX, sightY, sightZ) =
@@ -418,6 +462,30 @@ hitTest state (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) =
             focus = (x, y, z)
         }
 
+checkTeleport state =
+    let
+        player' = player state
+        GL.Vertex3 eyeX eyeY eyeZ = eye player'
+        (posX, posY, posZ) = (floor (eyeX-0.45), floor (eyeY-0.9), floor (eyeZ-0.45))
+        --((p1SrcX, p1SrcY, p1SrcZ), (p1DstX, p1DstY, p1DstZ)) = portal1
+        --((p2SrcX, p2SrcY, p2SrcZ), (p2DstX, p2DstY, p2DstZ)) = portal2
+        (p1Src, p1Dst) = portal1
+        (p2Src, p2Dst) = portal2
+        (posX', posY', posZ')
+            | (posX, posY, posZ) == p1Src = p1Dst
+            | (posX, posY, posZ) == p2Src = p2Dst
+            | otherwise = (posX, posY, posZ)
+        (eyeX', eyeY', eyeZ') = ((realToFrac posX')+0.45, (realToFrac posY')+0.9, (realToFrac posZ')+0.45)
+    in
+        if (posX, posY, posZ) == p1Src || (posX, posY, posZ) == p2Src
+            then
+                state {
+                    player = player' {
+                        eye = GL.Vertex3 eyeX' eyeY' eyeZ'
+                    }
+                }
+            else
+                state
 
 update :: State -> GL.GLfloat -> IORef GL.GLfloat -> IO State
 update state dt angle = do
@@ -427,6 +495,7 @@ update state dt angle = do
     a <- GLFW.getKey 'A'
     d <- GLFW.getKey 'D'
     space <- GLFW.getKey ' '
+    leftMouse <- GLFW.getMouseButton GLFW.ButtonLeft
     let state0 = state
         (mousePosLastX, mousePosLastY) = mousePosLast state0
         player0 = player state0
@@ -449,11 +518,18 @@ update state dt angle = do
         (moveX, moveY, moveZ) = getMoveVector (sightX, sightY, sightZ)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (moveX, moveY, moveZ)
 
-        stateAfterKeys = processKeyPress state0 [w, s, a, d, space]
+        stateAfterTeleport = checkTeleport state0
+        stateAfterKeys = processKeyPress stateAfterTeleport [w, s, a, d, space]
         stateAfterGravity = applyGravity stateAfterKeys dt
         stateAfterMovement = applyMovement stateAfterGravity dt
-        state' = hitTest stateAfterMovement (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ)
-        --state' = stateAfterGravity
+        --((blockX, blockY, blockZ), (prevX, prevY, prevZ)) = hitTest stateAfterMovement 
+        stateAfterHitTest = hitTest stateAfterMovement (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ)
+        stateAfterPutBlock
+            | leftMouse == GLFW.Press = putBlock stateAfterHitTest
+            | otherwise = stateAfterHitTest
+
+
+        state' = stateAfterPutBlock
         player' = player state'
         --vxx = (vx.player) stateAfterKeys
         --vyy = (vy.player) stateAfterKeys
@@ -464,6 +540,7 @@ update state dt angle = do
     return state' {
         player = player' { rotation = rotation' },
         mousePosLast = (mouseX, mouseY)
+        --focus = ((blockX, blockY, blockZ), (prevX, prevY, prevZ))
     }
 
 loop :: State -> GLTexture -> Float -> IORef GLfloat -> Int -> IO ()
@@ -476,6 +553,9 @@ loop state stuff lastTime angle countDown = do
     -- game
     newState <- Main.update state dt angle
     render newState stuff angle
+
+    --print $ (eye.player) newState
+
     angle $~! (+ 0.3)
     
     if countDown == 0
