@@ -11,7 +11,7 @@ import Data.Fixed
 
 import Etc
 
-data GLStuff = GLStuff {
+data GLTexture = GLTexture {
     brick :: GL.TextureObject,
     stone :: GL.TextureObject,
     sand :: GL.TextureObject,
@@ -34,6 +34,7 @@ type World = Map (Int, Int, Int) TexIndex
 data State = State {
     world :: World,
     shown :: World,
+    focus :: (Int, Int, Int),
     mousePosLast :: (GL.GLint, GL.GLint),
     gravityAcceleration :: GL.GLfloat,
     player :: Player
@@ -65,8 +66,9 @@ makeInitState = State {
                             [((x,y,z), BRICK) | x <- [-2, -1, 1, 2], z <- [-2, -1, 1, 2], y <- [29]] ++
                             [((x,y,z), BRICK) | x <- [-1..1], z <- [-1..1], y <- [29]],
     shown = Map.fromList [],
+    focus = (999, 999, 999),
     mousePosLast = (0, 0),
-    gravityAcceleration = 9.8,
+    gravityAcceleration = 20,
     player = Player {
         rotation = (0, 0),
         vx = 0.0,
@@ -77,7 +79,7 @@ makeInitState = State {
     }
 }
 
-initGL :: IO GLStuff
+initGL :: IO GLTexture
 initGL = do
     GL.clearColor $= GL.Color4 0.0 0.0 0.0 1.0
     GL.depthFunc $= Just GL.Lequal
@@ -100,7 +102,7 @@ initGL = do
     grass_sid <- loadTexture "texture/grass_sid.tga"
 
     -- make stuff
-    return $ GLStuff {
+    return $ GLTexture {
         brick = brick,
         stone = stone,
         sand = sand,
@@ -127,12 +129,13 @@ resize size@(Size w h) = do
 --            mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
 --                [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
 
-render :: State -> GLStuff -> IORef GLfloat -> IO ()
+render :: State -> GLTexture -> IORef GLfloat -> IO ()
 render state stuff angle = do
     let state0 = state
         player0 = player state0
         (alpha, beta) = rotation player0
         eye0 = eye player0
+        (focusX, focusY, focusZ) = focus state0
     GL.clear [GL.ColorBuffer, GL.DepthBuffer]
     -- ModelView
     GL.matrixMode $= GL.Modelview 0
@@ -164,6 +167,11 @@ render state stuff angle = do
                     GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
                     drawCubeBot
 
+    -- render focus block frame
+    --GL.preservingMatrix $ do
+    --    GL.translate $ (GL.Vector3 (realToFrac focusX) (realToFrac focusY) ((realToFrac focusZ)::GL.GLfloat))
+    --    GL.scale 1.1 1.1 (1.1::GL.GLfloat)
+    --    drawFrame
     -- render THREE BODIES
     a <- get angle
 
@@ -321,7 +329,7 @@ processKeyPress state keys =
             | otherwise = 0
         -- jump
         vy'
-            | keys!!4 == GLFW.Press = 5.2
+            | keys!!4 == GLFW.Press = 7.4 -- jump speed
             | otherwise = vy0
         --vy' = vspace
     in
@@ -398,9 +406,9 @@ applyMovement state dt =
         dz = dz0 * (cos alpha) + dx0 * (sin alpha)
         dx = (-dz0) * (sin alpha) + dx0 * (cos alpha)
         GL.Vertex3 eyeX eyeY eyeZ = eye player'
-        GL.Vertex3 posX posY posZ = GL.Vertex3 (eyeX - 0.45) (eyeY - 0.45) (eyeZ - 0.45)
+        GL.Vertex3 posX posY posZ = GL.Vertex3 (eyeX - 0.45) (eyeY - 0.9) (eyeZ - 0.45)
         GL.Vertex3 dx' dy' dz' = collide world0 (GL.Vertex3 posX posY posZ) (GL.Vertex3 (realToFrac dx) (realToFrac dy) (realToFrac dz))
-        GL.Vertex3 eyeX' eyeY' eyeZ' = GL.Vertex3 (posX + dx' + 0.45) (posY + dy' + 0.45) (posZ + dz' + 0.45)
+        GL.Vertex3 eyeX' eyeY' eyeZ' = GL.Vertex3 (posX + dx' + 0.45) (posY + dy' + 0.9) (posZ + dz' + 0.45)
         jump'
             | abs(dy') < 0.000001 = False
             | otherwise = True
@@ -416,6 +424,34 @@ applyMovement state dt =
             }
         }
 
+--hitTest :: State -> (GL.GLdouble, GL.GLdouble, GL.GLdouble) -> State
+--hitTest state posVector sightVector =
+    --let
+    --    world0 = world state
+    --    (key, prev) = _hitTest world0 (realToFrac 1) posVector posVector sightVector
+    --in
+    --    state
+
+--_hitTest :: World -> Float -> (Float, Float, Float) -> (Float, Float, Float) -> ((Int, Int, Int), (Int, Int, Int))
+--_hitTest world step (prevX, prevY, prevZ) (posX, posY, posZ) (sightX, sightY, sightZ) =
+--    let
+--        factor = step / 8
+--        (x, y, z) = (posX + sightX * factor, posY + sightY * factor, posZ + sightZ * factor)
+--        pos = (floor x, floor y, floor z)
+--        found = Map.lookup pos world
+--    in
+--        if factor > 4 then ((9999,9999,9999), (9999,9999,9999))
+--            else if found /= Nothing then ((prevX, prevY, prevZ), pos)
+--                else _hitTest world (step+1) pos (posX, posY, posZ) (sightX, sightY, sightZ)
+hitTest state (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) =
+    let
+        (x, y, z) = (floor $ eyeX+sightX, floor $ eyeY+sightY, floor $ eyeZ+sightZ)
+    in
+        state {
+            focus = (x, y, z)
+        }
+
+
 update :: State -> GL.GLfloat -> IORef GL.GLfloat -> IO State
 update state dt angle = do
     Position mouseX mouseY <- get GLFW.mousePos
@@ -427,7 +463,7 @@ update state dt angle = do
     let state0 = state
         (mousePosLastX, mousePosLastY) = mousePosLast state0
         player0 = player state0
-        GL.Vertex3 x y z = eye player0
+        GL.Vertex3 eyeX eyeY eyeZ = eye player0
         (alpha0, beta0) = rotation player0
 
         -- get mouse movement
@@ -448,7 +484,8 @@ update state dt angle = do
 
         stateAfterKeys = processKeyPress state0 [w, s, a, d, space]
         stateAfterGravity = applyGravity stateAfterKeys dt
-        state' = applyMovement stateAfterGravity dt
+        stateAfterMovement = applyMovement stateAfterGravity dt
+        state' = hitTest stateAfterMovement (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ)
         --state' = stateAfterGravity
         player' = player state'
         --vxx = (vx.player) stateAfterKeys
@@ -462,7 +499,7 @@ update state dt angle = do
         mousePosLast = (mouseX, mouseY)
     }
 
-loop :: State -> GLStuff -> Float -> IORef GLfloat -> Int -> IO ()
+loop :: State -> GLTexture -> Float -> IORef GLfloat -> Int -> IO ()
 loop state stuff lastTime angle countDown = do
     -- dt
     nowD <- get time
