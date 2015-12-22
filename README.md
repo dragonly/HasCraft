@@ -13,5 +13,10 @@ ghc Main.hs
 ./Main
 ```
 
-![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot.png)
-![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot1.png)
+## TODO
+
+ganna following @[fogleman](https://github.com/fogleman) to make a robust and featured runnable multiuser client over network
+
+![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot3.png)
+![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot4.png)
+![](https://github.com/dragonly/HasCraft/raw/master/texture/screenshot5.png)
