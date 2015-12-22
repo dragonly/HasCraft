@@ -11,7 +11,7 @@ import Data.Fixed
 
 import Etc
 
-data GLStuff = GLStuff {
+data GLTexture = GLTexture {
     brick :: GL.TextureObject,
     stone :: GL.TextureObject,
     sand :: GL.TextureObject,
@@ -41,11 +41,35 @@ data State = State {
 
 makeInitState :: State
 makeInitState = State {
-    world = Map.fromList $  [((x,y,z), GRASS) | x <- [-10..10], z <- [-10..10], y <- [-1]] ++
-                            [((x,y,z), STONE) | x <- [-10, 10], z <- [-10, 10], y <- [0..20]] ++ 
-                            [((x,y,z), SAND ) | x <- [-10, -9, 9, 10], z <- [-10..10], y <- [-1]] ++ 
+    world = Map.fromList $  [((x,y,z), GRASS) | x <- [-10..(-4)], z <- [-10..10], y <- [-1]] ++ --Floor
+                            [((x,y,z), GRASS) | x <- [-2..10], z <- [-10..10], y <- [-1]] ++
+                            [((x,y,z), GRASS) | x <- [-3], z <- [-10..(-7)], y <- [-1]] ++
+                            [((x,y,z), GRASS) | x <- [-3], z <- [1..10], y <- [-1]] ++
+                            [((x,y,z), GRASS) | x <- [-3], z <- [-3], y <- [-1]] ++
+                            [((x,y,z), BRICK) | x <- [-3], z <- [-6], y <- [-2]] ++ --Stairs
+                            [((x,y,z), BRICK) | x <- [-3], z <- [-4], y <- [-2]] ++
+                            [((x,y,z), BRICK) | x <- [-3], z <- [-2], y <- [-2]] ++
+                            [((x,y,z), BRICK) | x <- [-3], z <- [0], y <- [-2]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-9..(-3)] (repeat (-1)) [-9..(-3)]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-3..3] (repeat (-1)) [-3, (-4)..(-9)]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-9..(-3)] (repeat (-5)) [-9..(-3)]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-3..3] (repeat (-5)) [-3, (-4)..(-9)]] ++
+                            [((x,y,z), GRASS) | x <- [-12..(-10)], z <- [-10..6], y <- [-9]] ++ --Platforms
+                            [((x,y,z), GRASS) | x <- [4..6], z <- [-10..6], y <- [-9]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-9..(-3)] (repeat 0) [-9, (-10)..(-15)]] ++ --Stairs2
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-3..3] (repeat (0)) [-15..(-9)]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-9..(-3)] (repeat (-6)) [-9, (-10)..(-15)]] ++
+                            [((x,y,z), BRICK) | (x, z, y) <- zip3 [-3..3] (repeat (-6)) [-15..(-9)]] ++
+                            [((x,y,z), GRASS) | x <- [-6..0], z <- [-6..0], y <- [-15]] ++ --Platforms2
+                            [((x,y,z), GRASS) | x <- [1..6], z <- [-5..(-1)], y <- [-15]] ++
+                            [((x,y,z), GRASS) | x <- [7], z <- [-4..(-2)], y <- [-15]] ++
+                            [((x,y,z), GRASS) | x <- [8], z <- [-3], y <- [-15]] ++
+                            [((x,y,z), STONE) | x <- [7], z <- [-4, (-2)], y <- [-14, (-13)]] ++ --Portal1
+                            [((x,y,z), STONE) | x <- [7], z <- [-4..(-2)], y <- [-12]] ++
+                            [((x,y,z), STONE) | x <- [-10, 10], z <- [-10, 10], y <- [0..20]] ++ --Columns
+                            [((x,y,z), SAND ) | x <- [-10, -9, 9, 10], z <- [-10..10], y <- [-1]] ++ --Sides
                             [((x,y,z), SAND ) | x <- [-10..10], z <- [-10, -9, 9, 10], y <- [-1]] ++ 
-                            [((x,y,z), STONE) | x <- [-8..(-4)], z <- [-2..2], y <- [0]] ++
+                            [((x,y,z), STONE) | x <- [-8..(-4)], z <- [-2..2], y <- [0]] ++ --Tower
                             [((x,y,z), STONE) | x <- [-2..2], z <- [-2..2], y <- [0]] ++
                             [((x,y,z), STONE) | x <- [-8..(-4)], z <- [-8..(-4)], y <- [0]] ++
                             [((x,y,z), STONE) | x <- [-2..2], z <- [-8..(-4)], y <- [0]] ++
@@ -54,7 +78,24 @@ makeInitState = State {
                             [((x,y,z), GRASS) | x <- [-5..(-1)], z <- [-5..(-1)], y <- [3]] ++
                             [((x,y,z), STONE) | x <- [-4..(-2)], z <- [-4..(-2)], y <- [4]] ++
                             [((x,y,z), GRASS) | x <- [-3], z <- [-3], y <- [5]] ++
-                            [((x,y,z), BRICK) | x <- [-10, -9, 9, 10], z <- [-10, -9, 9, 10], y <- [21]] ++
+                            [((x,y,z), GRASS) | x <- [17..22], z <- [-2..2], y <- [100]] ++ --FaithPlat
+                            [((x,y,z), GRASS) | x <- [16, 23], z <- [-1..1], y <- [100]] ++
+                            [((x,y,z), GRASS) | x <- [15, 24], z <- [0], y <- [100]] ++
+                            [((x,y,z), STONE) | x <- [23], z <- [-1, 1], y <- [101, 102]] ++ --Portal2
+                            [((x,y,z), STONE) | x <- [23], z <- [-1..1], y <- [103]] ++
+                            [((x,y,z), BRICK) | x <- [19, 20], z <- [3, 4], y <- [100]] ++ --FaithStair
+                            [((x,y,z), BRICK) | x <- [20, 21], z <- [4, 5], y <- [99]] ++
+                            [((x,y,z), BRICK) | x <- [21, 22], z <- [5, 6], y <- [98]] ++
+                            [((x,y,z), BRICK) | x <- [22, 23], z <- [6, 7], y <- [97]] ++
+                            [((x,y,z), BRICK) | x <- [23, 24], z <- [7, 8], y <- [96]] ++
+                            [((x,y,z), BRICK) | x <- [24, 25], z <- [8, 9], y <- [95]] ++
+                            [((x,y,z), BRICK) | x <- [25, 26], z <- [7, 8], y <- [94]] ++
+                            [((x,y,z), BRICK) | x <- [26, 27], z <- [6, 7], y <- [93]] ++
+                            [((x,y,z), BRICK) | x <- [27, 28], z <- [5, 6], y <- [92]] ++
+                            [((x,y,z), BRICK) | x <- [28, 29], z <- [4, 5], y <- [91]] ++
+                            [((x,y,z), BRICK) | x <- [29, 30], z <- [3, 4], y <- [90]] ++
+                            [((x,y,z), GRASS) | x <- [26..33], z <- [0..7], y <- [89]] ++
+                            [((x,y,z), BRICK) | x <- [-10, -9, 9, 10], z <- [-10, -9, 9, 10], y <- [21]] ++ --Roof
                             [((x,y,z), BRICK) | x <- [-9, -8, 8, 9], z <- [-9, -8, 8, 9], y <- [22]] ++
                             [((x,y,z), BRICK) | x <- [-8, -7, 7, 8], z <- [-8, -7, 7, 8], y <- [23]] ++
                             [((x,y,z), BRICK) | x <- [-7, -6, 6, 7], z <- [-7, -6, 6, 7], y <- [24]] ++
@@ -66,18 +107,18 @@ makeInitState = State {
                             [((x,y,z), BRICK) | x <- [-1..1], z <- [-1..1], y <- [29]],
     shown = Map.fromList [],
     mousePosLast = (0, 0),
-    gravityAcceleration = 9.8,
+    gravityAcceleration = 20,
     player = Player {
         rotation = (0, 0),
         vx = 0.0,
         vy = 0.0,
         vz = 0.0,
         jump = True,
-        eye = GL.Vertex3 0 10 0
+        eye = GL.Vertex3 28 94 2
     }
 }
 
-initGL :: IO GLStuff
+initGL :: IO GLTexture
 initGL = do
     GL.clearColor $= GL.Color4 0.0 0.0 0.0 1.0
     GL.depthFunc $= Just GL.Lequal
@@ -100,7 +141,7 @@ initGL = do
     grass_sid <- loadTexture "texture/grass_sid.tga"
 
     -- make stuff
-    return $ GLStuff {
+    return $ GLTexture {
         brick = brick,
         stone = stone,
         sand = sand,
@@ -127,7 +168,37 @@ resize size@(Size w h) = do
 --            mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
 --                [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
 
-render :: State -> GLStuff -> IORef GLfloat -> IO ()
+putStuff :: TexIndex -> GLTexture -> GL.Vector3 GL.GLfloat -> IORef GLfloat -> GL.Vector3 GL.GLfloat -> GL.Vector3 GL.GLfloat -> IO ()
+putStuff texture stuff translateBeforeRotateVector angle rotateVector translateAfterRotateVector = do
+    GL.preservingMatrix $ do
+        GL.translate $ translateBeforeRotateVector
+
+        rotateAngle <- get angle
+
+        GL.rotate rotateAngle $ rotateVector
+
+        GL.translate $ translateAfterRotateVector
+
+        case texture of
+            BRICK -> GL.textureBinding GL.Texture2D $= Just (brick stuff)
+            STONE -> GL.textureBinding GL.Texture2D $= Just (stone stuff)
+            SAND -> GL.textureBinding GL.Texture2D $= Just (sand stuff)
+            GRASS -> GL.textureBinding GL.Texture2D $= Just (grass_sid stuff) 
+
+        if texture == BRICK || texture == STONE || texture == SAND
+            then do
+                drawCubeSide
+                drawCubeTop
+                drawCubeBot
+            else do
+                drawCubeSide
+                GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
+                drawCubeTop
+                GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
+                drawCubeBot
+    return ()    
+
+render :: State -> GLTexture -> IORef GLfloat -> IO ()
 render state stuff angle = do
     let state0 = state
         player0 = player state0
@@ -164,108 +235,9 @@ render state stuff angle = do
                     GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
                     drawCubeBot
 
-    -- render THREE BODIES
-    a <- get angle
-
-    GL.preservingMatrix $ do
-        GL.rotate a $ GL.Vector3 1 0 (0::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-90) $ GL.Vector3 1 0 (0::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-180) $ GL.Vector3 1 0 (0::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-270) $ GL.Vector3 1 0 (0::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-
-    GL.preservingMatrix $ do
-        GL.rotate (a-45) $ GL.Vector3 0 0 (1::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-135) $ GL.Vector3 0 0 (1::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-225) $ GL.Vector3 0 0 (1::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-    GL.preservingMatrix $ do
-        GL.rotate (a-315) $ GL.Vector3 0 0 (1::GL.GLfloat)
-        --GL.scale 0.7 0.7 (0.7::GL.GLfloat)
-
-        GL.translate $ (GL.Vector3 0 22 0 :: GL.Vector3 GL.GLfloat)
-
-        GL.textureBinding GL.Texture2D $= Just (grass_sid stuff)
-        drawCubeSide
-        GL.textureBinding GL.Texture2D $= Just (grass_bot stuff)
-        drawCubeTop
-        GL.textureBinding GL.Texture2D $= Just (grass_top stuff)
-        drawCubeBot
-
-    --drawAxis
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 1 0 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 5 0 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 0 1 0 :: GL.Vector3 GL.GLfloat) (GL.Vector3 0 0 5 :: GL.Vector3 GL.GLfloat)
+    putStuff GRASS stuff (GL.Vector3 0 20 0 :: GL.Vector3 GL.GLfloat) angle (GL.Vector3 0 0 1 :: GL.Vector3 GL.GLfloat) (GL.Vector3 5 0 0 :: GL.Vector3 GL.GLfloat)
 
     GLFW.swapBuffers
 
@@ -462,7 +434,7 @@ update state dt angle = do
         mousePosLast = (mouseX, mouseY)
     }
 
-loop :: State -> GLStuff -> Float -> IORef GLfloat -> Int -> IO ()
+loop :: State -> GLTexture -> Float -> IORef GLfloat -> Int -> IO ()
 loop state stuff lastTime angle countDown = do
     -- dt
     nowD <- get time
