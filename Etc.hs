@@ -7,6 +7,21 @@ v x y z = GL.vertex (GL.Vertex3 x y z :: GL.Vertex3 GLfloat)
 n x y z = GL.normal (GL.Normal3 x y z :: GL.Normal3 GLfloat)
 t u v   = GL.texCoord (GL.TexCoord2 u v :: GL.TexCoord2 GLfloat)
 
+drawFrame :: IO ()
+drawFrame = do
+    renderPrimitive LineLoop $ do
+        GL.clearColor $= GL.Color4 0 0 0 0
+
+        v 0 0 0
+        v 1 0 0
+        v 1 0 1
+        v 0 0 1
+        v 0 0 0
+        v 0 0 1
+        v 1 0 1
+        v 1 1 1
+        v 0 1 1
+
 drawCubeSide :: IO ()
 drawCubeSide = renderPrimitive Quads $ do
     -- back
