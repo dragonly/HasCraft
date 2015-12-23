@@ -549,11 +549,11 @@ update state dt angle = do
 
         state' = stateAfterPutBlock
         player' = player state'
-        vxx = (vx.player) stateAfterKeys
-        vyy = (vy.player) stateAfterKeys
-        vzz = (vz.player) stateAfterKeys
+    --    vxx = (vx.player) stateAfterKeys
+    --    vyy = (vy.player) stateAfterKeys
+    --    vzz = (vz.player) stateAfterKeys
     
-    print $ (vxx, vyy, vzz)
+    --print $ (vxx, vyy, vzz)
     --print $ (jump.player) stateAfterKeys
     return state' {
         player = player' { rotation = rotation' },
