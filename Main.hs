@@ -20,6 +20,8 @@ data GLTexture = GLTexture {
     grass_sid :: GL.TextureObject
 }
 data TexIndex = BRICK | STONE | SAND | GRASS deriving (Eq, Show)
+
+-- special position for teleportation
 portal1 :: ((Int, Int, Int), (Int, Int, Int))
 portal1 = ((8, (-14), (-3)), (15, 101+4, 0))
 portal2 :: ((Int, Int, Int), (Int, Int, Int))
@@ -33,12 +35,13 @@ data Player = Player {
     jump :: Bool,
     eye :: GL.Vertex3 GL.GLdouble
 }
-type World = Map (Int, Int, Int) TexIndex
 
+type World = Map (Int, Int, Int) TexIndex
 data State = State {
     world :: World,
-    shown :: World,
+    shown :: World, -- for optimization, not used yet
     focus :: (Int, Int, Int),
+    countDown :: Int,
     mousePosLast :: (GL.GLint, GL.GLint),
     gravityAcceleration :: GL.GLfloat,
     player :: Player
@@ -112,6 +115,7 @@ makeInitState = State {
                             [((x,y,z), BRICK) | x <- [-1..1], z <- [-1..1], y <- [29]],
     shown = Map.fromList [],
     focus = (999, 999, 999),
+    countDown = 60,
     mousePosLast = (0, 0),
     gravityAcceleration = 20,
     player = Player {
@@ -174,15 +178,20 @@ resize size@(Size w h) = do
 --            mapM_ (\(x,y,z) -> GL.vertex $ GL.Vertex3 x y (z::GL.GLfloat))
 --                [(0,0,0),(100,0,0),(0,0,0),(0,100,0),(0,0,0),(0,0,100)]
 
+-- design `focus` field to draw a frame on the focus block, not implemented yet
 putBlock state =
     let
         focusPos = focus state
         world0 = world state
         world' = Map.insert focusPos BRICK world0
+        countDown0 = countDown state
     in
-        state {
-            world = world'
-        }
+        if (countDown0 `mod` 10) == 0
+            then state {
+                     world = world'
+                 }
+            else
+                state
 
 putStuff :: TexIndex -> GLTexture -> GL.Vector3 GL.GLfloat -> GLfloat -> GL.Vector3 GL.GLfloat -> GL.Vector3 GL.GLfloat -> IO ()
 putStuff texture stuff translateBeforeRotateVector rotateAngle rotateVector translateAfterRotateVector = do
@@ -311,6 +320,7 @@ processKeyPress state keys =
         vx0 = vx player'
         vy0 = vy player'
         vz0 = vz player'
+        countDown0 = countDown state
         vz'
             | keys!!0 == GLFW.Press && keys!!1 == GLFW.Release = (-2)
             | keys!!0 == GLFW.Release && keys!!1 == GLFW.Press = 2
@@ -321,7 +331,7 @@ processKeyPress state keys =
             | otherwise = 0
         -- jump
         vy'
-            | keys!!4 == GLFW.Press = 7.4 -- jump speed
+            | keys!!4 == GLFW.Press && (countDown0 `mod` 10) == 0 = 7.4 -- jump speed
             | otherwise = vy0
         --vy' = vspace
     in
@@ -385,12 +395,14 @@ checkCollision world positions =
     in
         if result == Nothing then False else True
 
+-- apply movement with regards to velocity player gains in this frame
 applyMovement :: State -> GL.GLfloat -> State
 applyMovement state dt =
     let
         world0 = world state
         player' = player state
         (alpha, beta) = rotation player'
+        -- calculate delta 
         dx0 = (vx player') * (realToFrac dt)
         dy0 = (vy player') * (realToFrac dt)
         dz0 = (vz player') * (realToFrac dt)
@@ -462,21 +474,23 @@ hitTest state (eyeX, eyeY, eyeZ) (sightX, sightY, sightZ) =
             focus = (x, y, z)
         }
 
+-- if in teleport point, then move to destination
 checkTeleport state =
     let
         player' = player state
         GL.Vertex3 eyeX eyeY eyeZ = eye player'
+        -- get player position of the near-origin-corner
         (posX, posY, posZ) = (floor (eyeX-0.45), floor (eyeY-0.9), floor (eyeZ-0.45))
-        --((p1SrcX, p1SrcY, p1SrcZ), (p1DstX, p1DstY, p1DstZ)) = portal1
-        --((p2SrcX, p2SrcY, p2SrcZ), (p2DstX, p2DstY, p2DstZ)) = portal2
         (p1Src, p1Dst) = portal1
         (p2Src, p2Dst) = portal2
+        -- set portal destination, or do nothing
         (posX', posY', posZ')
             | (posX, posY, posZ) == p1Src = p1Dst
             | (posX, posY, posZ) == p2Src = p2Dst
             | otherwise = (posX, posY, posZ)
         (eyeX', eyeY', eyeZ') = ((realToFrac posX')+0.45, (realToFrac posY')+0.9, (realToFrac posZ')+0.45)
     in
+        -- only apply movement when player is at the portal point
         if (posX, posY, posZ) == p1Src || (posX, posY, posZ) == p2Src
             then
                 state {
@@ -487,8 +501,10 @@ checkTeleport state =
             else
                 state
 
+-- update game state
 update :: State -> GL.GLfloat -> IORef GL.GLfloat -> IO State
 update state dt angle = do
+    -- get key press state and mouse position
     Position mouseX mouseY <- get GLFW.mousePos
     w <- GLFW.getKey 'W'
     s <- GLFW.getKey 'S'
@@ -496,6 +512,7 @@ update state dt angle = do
     d <- GLFW.getKey 'D'
     space <- GLFW.getKey ' '
     leftMouse <- GLFW.getMouseButton GLFW.ButtonLeft
+
     let state0 = state
         (mousePosLastX, mousePosLastY) = mousePosLast state0
         player0 = player state0
@@ -518,6 +535,7 @@ update state dt angle = do
         (moveX, moveY, moveZ) = getMoveVector (sightX, sightY, sightZ)
         (crossX, crossY, crossZ) = getCrossProduct (0, 1, 0) (moveX, moveY, moveZ)
 
+        -- apply all sorts of key press and gravity
         stateAfterTeleport = checkTeleport state0
         stateAfterKeys = processKeyPress stateAfterTeleport [w, s, a, d, space]
         stateAfterGravity = applyGravity stateAfterKeys dt
@@ -531,11 +549,11 @@ update state dt angle = do
 
         state' = stateAfterPutBlock
         player' = player state'
-        --vxx = (vx.player) stateAfterKeys
-        --vyy = (vy.player) stateAfterKeys
-        --vzz = (vz.player) stateAfterKeys
+        vxx = (vx.player) stateAfterKeys
+        vyy = (vy.player) stateAfterKeys
+        vzz = (vz.player) stateAfterKeys
     
-    --print $ (vxx, vyy, vzz)
+    print $ (vxx, vyy, vzz)
     --print $ (jump.player) stateAfterKeys
     return state' {
         player = player' { rotation = rotation' },
@@ -543,22 +561,23 @@ update state dt angle = do
         --focus = ((blockX, blockY, blockZ), (prevX, prevY, prevZ))
     }
 
-loop :: State -> GLTexture -> Float -> IORef GLfloat -> Int -> IO ()
-loop state stuff lastTime angle countDown = do
+-- game loop
+loop :: State -> GLTexture -> Float -> IORef GLfloat -> IO ()
+loop state stuff lastTime angle = do
     -- dt
     nowD <- get time
     let now = realToFrac nowD
     let dt = realToFrac $ now - lastTime
 
-    -- game
+    -- update game state then render to screen
     newState <- Main.update state dt angle
     render newState stuff angle
 
     --print $ (eye.player) newState
 
     angle $~! (+ 0.3)
-    
-    if countDown == 0
+    let countDown0 = countDown state
+    if countDown0 == 0
         then putStrLn $ "FPS: " ++ (show $ 1/dt)
         else return ()
 
@@ -567,8 +586,7 @@ loop state stuff lastTime angle countDown = do
     q <- GLFW.getKey 'Q'
     open <- GLFW.getParam GLFW.Opened
     if open && esc /= GLFW.Press && q /= GLFW.Press
-        then loop newState stuff now angle ((countDown-1) `mod` 60)
-        --then loop state stuff now angle
+        then loop (newState {countDown = ((countDown0-1) `mod` 60)}) stuff now angle
         else return ()
 
 main :: IO ()
@@ -593,13 +611,14 @@ main = do
     -- set up sky and fog
     GL.clearColor $= GL.Color4 0.5 0.69 1.0 1
     GL.textureFilter GL.Texture2D $= ((GL.Linear', Nothing), GL.Linear') 
-    GL.fogColor $= GL.Color4 0.5 0.69 1.0 1
-    GL.fogMode $= GL.Linear 5 60
+    --GL.fogColor $= GL.Color4 0.5 0.69 1.0 1
+    --GL.fogMode $= GL.Linear 5 60
 
-    -- main loop
     now <- get GLFW.time
+    -- for satellite blocks revolution
     angle <- newIORef 0
-    loop state stuff (realToFrac now) angle 60
+    -- main loop
+    loop state stuff (realToFrac now) angle
     
     GLFW.closeWindow
     GLFW.terminate
