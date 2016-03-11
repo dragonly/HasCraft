@@ -186,12 +186,15 @@ putBlock state =
         world' = Map.insert focusPos BRICK world0
         countDown0 = countDown state
     in
-        if (countDown0 `mod` 10) == 0
-            then state {
-                     world = world'
-                 }
-            else
-                state
+        --if (countDown0 `mod` 10) == 0
+        --    then state {
+        --             world = world'
+        --         }
+        --    else
+        --        state
+        state {
+             world = world'
+        }
 
 putStuff :: TexIndex -> GLTexture -> GL.Vector3 GL.GLfloat -> GLfloat -> GL.Vector3 GL.GLfloat -> GL.Vector3 GL.GLfloat -> IO ()
 putStuff texture stuff translateBeforeRotateVector rotateAngle rotateVector translateAfterRotateVector = do
@@ -331,7 +334,8 @@ processKeyPress state keys =
             | otherwise = 0
         -- jump
         vy'
-            | keys!!4 == GLFW.Press && (countDown0 `mod` 10) == 0 = 7.4 -- jump speed
+            --| keys!!4 == GLFW.Press && (countDown0 `mod` 10) == 0 = 7.4 -- jump speed
+            | keys!!4 == GLFW.Press = 7.4 -- jump speed
             | otherwise = vy0
         --vy' = vspace
     in
